@@ -1,82 +1,94 @@
+"""
+Tierra de las Manzanas - Nivel 1 (Combate)
+Juego 2D desarrollado con pygame
+"""
 import pygame
 import sys
-from PIL import Image
-import requests
-from io import BytesIO
+from typing import Dict, List, Optional, Tuple, Any
 import random
 
-# Importar sistemas de ataque y enemigos
+# Importar módulos del juego
 from adan_attacks import AdanAttack
 from juan_attacks import JuanAttack
 from worm_enemy import WormEnemy, WormSpawner
+from utils import (
+    ResourceCache, download_with_cache, load_gif_frames, 
+    create_backup_surface, clamp, distance, lerp
+)
+import config
 
 class Character:
-    def __init__(self, name, gif_urls, x, y):
+    """Representa un personaje jugable en el juego"""
+    
+    def __init__(self, name: str, gif_urls: Dict[str, str], x: float, y: float, cache: Optional[ResourceCache] = None):
         self.name = name
         self.x = x
         self.y = y
-        self.speed = 5
+        self.speed = config.CHARACTER_SPEED
         self.current_direction = "down"
         self.moving = False
-        self.animation_frame = 0
-        self.animation_speed = 0.2
+        self.animation_frame = 0.0
+        self.animation_speed = config.ANIMATION_SPEED
         self.gif_urls = gif_urls
-        self.animations = {}
+        self.animations: Dict[str, List[pygame.Surface]] = {}
+        self.cache = cache or ResourceCache()
         
         # Sistema de salud
-        self.max_health = 100
+        self.max_health = config.MAX_HEALTH
         self.health = self.max_health
         
         # Invulnerabilidad temporal tras recibir daño
         self.invulnerable = False
         self.invulnerable_time = 0
-        self.invulnerable_duration = 1000  # 1 segundo
+        self.invulnerable_duration = config.INVULNERABLE_DURATION
+        
+        # Estado de carga
+        self.animations_loaded = False
         
         self.load_animations()
         
-    def load_animations(self):
-        """Carga todos los GIFs y extrae sus frames"""
+    def load_animations(self) -> None:
+        """Carga todos los GIFs y extrae sus frames con sistema de cache"""
         print(f"Cargando animaciones de {self.name}...")
         
         for direction, url in self.gif_urls.items():
             try:
-                print(f"📥 Descargando {self.name} {direction} desde GitHub...")
+                print(f"📥 Procesando {self.name} {direction}...")
                 
-                response = requests.get(url)
-                response.raise_for_status()
-                gif_data = BytesIO(response.content)
+                # Descargar con cache
+                gif_data = download_with_cache(url, self.cache)
+                if not gif_data:
+                    print(f"❌ No se pudo descargar {self.name} {direction}")
+                    self.animations[direction] = [create_backup_surface()]
+                    continue
                 
-                gif = Image.open(gif_data)
-                frames = []
-                
-                for frame_num in range(gif.n_frames):
-                    gif.seek(frame_num)
-                    frame = gif.copy().convert("RGBA")
-                    
-                    frame_data = frame.tobytes()
-                    pygame_surface = pygame.image.fromstring(frame_data, frame.size, "RGBA")
-                    
-                    pygame_surface = pygame_surface.convert_alpha()
-                    pygame_surface.set_colorkey((255, 255, 255))
-                    
-                    frames.append(pygame_surface)
-                
+                # Procesar frames
+                frames = load_gif_frames(gif_data)
                 self.animations[direction] = frames
+                
                 print(f"✅ Cargada animación {self.name} '{direction}': {len(frames)} frames")
                 
             except Exception as e:
                 print(f"❌ Error cargando {self.name} {direction}: {e}")
-                backup_surface = pygame.Surface((64, 64))
-                backup_surface.fill((255, 0, 255))
-                self.animations[direction] = [backup_surface]
+                self.animations[direction] = [create_backup_surface()]
+        
+        self.animations_loaded = True
+        print(f"✅ Animaciones de {self.name} cargadas completamente")
     
-    def take_damage(self, damage):
-        """Recibe daño"""
+    def take_damage(self, damage: int) -> bool:
+        """
+        Aplica daño al personaje
+        
+        Args:
+            damage: Cantidad de daño a aplicar
+        
+        Returns:
+            True si el personaje murió, False en caso contrario
+        """
         if self.invulnerable:
             return False
         
-        self.health -= damage
-        self.health = max(0, self.health)
+        self.health = max(0, self.health - damage)
         
         # Activar invulnerabilidad temporal
         self.invulnerable = True
@@ -86,20 +98,37 @@ class Character:
         
         if self.health <= 0:
             print(f"💀 {self.name} ha sido derrotado")
-            return True  # Indica que el personaje murió
+            return True
         
         return False
     
-    def update(self, keys_pressed):
-        """Actualiza el movimiento y animación del personaje"""
+    def update(self, keys_pressed: pygame.key.ScancodeWrapper) -> None:
+        """
+        Actualiza el movimiento y animación del personaje
+        
+        Args:
+            keys_pressed: Estado actual de las teclas presionadas
+        """
         self.moving = False
         
         # Actualizar invulnerabilidad
+        self._update_invulnerability()
+        
+        # Procesar movimiento
+        self._process_movement(keys_pressed)
+        
+        # Actualizar animación
+        self._update_animation()
+    
+    def _update_invulnerability(self) -> None:
+        """Actualiza el estado de invulnerabilidad"""
         if self.invulnerable:
             current_time = pygame.time.get_ticks()
             if current_time - self.invulnerable_time >= self.invulnerable_duration:
                 self.invulnerable = False
-        
+    
+    def _process_movement(self, keys_pressed: pygame.key.ScancodeWrapper) -> None:
+        """Procesa el movimiento del personaje"""
         # Detectar movimiento y dirección
         if keys_pressed[pygame.K_UP] or keys_pressed[pygame.K_w]:
             self.y -= self.speed
@@ -120,19 +149,40 @@ class Character:
             self.x += self.speed
             self.current_direction = "right" if self.name == "Adán" else "left"
             self.moving = True
-        
-        # Actualizar frame de animación
+    
+    def _update_animation(self) -> None:
+        """Actualiza el frame de animación"""
         if self.moving:
             self.animation_frame += self.animation_speed
-            if self.current_direction in self.animations and len(self.animations[self.current_direction]) > 0:
+            if (self.current_direction in self.animations and 
+                len(self.animations[self.current_direction]) > 0):
                 if self.animation_frame >= len(self.animations[self.current_direction]):
                     self.animation_frame = 0
         else:
             self.animation_frame = 0
     
-    def draw(self, screen, camera_x, camera_y):
-        """Dibuja al personaje en la pantalla con offset de cámara"""
-        if self.current_direction in self.animations and len(self.animations[self.current_direction]) > 0:
+    def draw(self, screen: pygame.Surface, camera_x: float, camera_y: float) -> None:
+        """
+        Dibuja al personaje en la pantalla con offset de cámara
+        
+        Args:
+            screen: Superficie donde dibujar
+            camera_x: Offset X de la cámara
+            camera_y: Offset Y de la cámara
+        """
+        if not self.animations_loaded:
+            # Dibujar placeholder mientras cargan las animaciones
+            placeholder_rect = pygame.Rect(
+                self.x - camera_x, self.y - camera_y, 
+                config.CHARACTER_SIZE, config.CHARACTER_SIZE
+            )
+            color = (255, 165, 0) if self.name == "Adán" else (0, 255, 0)
+            pygame.draw.rect(screen, color, placeholder_rect)
+            return
+        
+        if (self.current_direction in self.animations and 
+            len(self.animations[self.current_direction]) > 0):
+            
             current_frames = self.animations[self.current_direction]
             frame_index = int(self.animation_frame) % len(current_frames)
             current_sprite = current_frames[frame_index]
@@ -148,12 +198,22 @@ class Character:
             screen.blit(current_sprite, (self.x - camera_x, self.y - camera_y))
         else:
             # Placeholder si no hay animación
-            placeholder_rect = pygame.Rect(self.x - camera_x, self.y - camera_y, 64, 64)
+            placeholder_rect = pygame.Rect(
+                self.x - camera_x, self.y - camera_y, 
+                config.CHARACTER_SIZE, config.CHARACTER_SIZE
+            )
             color = (255, 165, 0) if self.name == "Adán" else (0, 255, 0)
             pygame.draw.rect(screen, color, placeholder_rect)
     
-    def draw_health_bar(self, screen, camera_x, camera_y):
-        """Dibuja la barra de vida del personaje"""
+    def draw_health_bar(self, screen: pygame.Surface, camera_x: float, camera_y: float) -> None:
+        """
+        Dibuja la barra de vida del personaje
+        
+        Args:
+            screen: Superficie donde dibujar
+            camera_x: Offset X de la cámara
+            camera_y: Offset Y de la cámara
+        """
         if self.health < self.max_health:
             bar_width = 60
             bar_height = 8
@@ -166,26 +226,53 @@ class Character:
             
             # Vida actual
             health_width = int((self.health / self.max_health) * bar_width)
-            health_color = (0, 255, 0) if self.health > 30 else (255, 255, 0) if self.health > 15 else (255, 0, 0)
+            health_color = self._get_health_color()
             pygame.draw.rect(screen, health_color, 
                            (bar_x, bar_y, health_width, bar_height))
+    
+    def _get_health_color(self) -> Tuple[int, int, int]:
+        """Retorna el color de la barra de vida basado en la salud actual"""
+        health_percentage = self.health / self.max_health
+        if health_percentage > 0.6:
+            return (0, 255, 0)  # Verde
+        elif health_percentage > 0.3:
+            return (255, 255, 0)  # Amarillo
+        else:
+            return (255, 0, 0)  # Rojo
 
 class Background:
-    def __init__(self, image_url, width, height):
+    """Maneja el fondo del juego con scroll infinito"""
+    
+    def __init__(self, image_url: str, width: int, height: int, cache: Optional[ResourceCache] = None):
         self.width = width
         self.height = height
-        self.image = None
+        self.image: Optional[pygame.Surface] = None
+        self.cache = cache or ResourceCache()
         self.load_background(image_url)
         
-    def load_background(self, url):
-        """Carga la imagen de fondo desde GitHub"""
+    def load_background(self, url: str) -> None:
+        """
+        Carga la imagen de fondo desde GitHub con sistema de cache
+        
+        Args:
+            url: URL de la imagen de fondo
+        """
         try:
             print("📥 Descargando escenario nivel 1...")
-            response = requests.get(url)
-            response.raise_for_status()
             
-            image_data = BytesIO(response.content)
-            pil_image = Image.open(image_data)
+            # Descargar con cache
+            image_data = download_with_cache(url, self.cache)
+            if not image_data:
+                print("❌ No se pudo descargar el escenario")
+                self._create_fallback_background()
+                return
+            
+            # Convertir imagen
+            from PIL import Image
+            from io import BytesIO
+            
+            image_stream = BytesIO(image_data)
+            pil_image = Image.open(image_stream)
             
             # Convertir a superficie de pygame
             image_data = pil_image.tobytes()
@@ -195,113 +282,156 @@ class Background:
             
         except Exception as e:
             print(f"❌ Error cargando escenario: {e}")
-            # Crear fondo de respaldo
-            self.image = pygame.Surface((self.width, self.height))
-            self.image.fill((34, 139, 34))  # Verde bosque
+            self._create_fallback_background()
     
-    def draw(self, screen, camera_x, camera_y, screen_width, screen_height):
-        """Dibuja el fondo con desplazamiento de cámara"""
-        if self.image:
-            # Calcular posición del fondo
-            bg_x = -camera_x % self.width
-            bg_y = -camera_y % self.height
+    def _create_fallback_background(self) -> None:
+        """Crea un fondo de respaldo"""
+        self.image = pygame.Surface((self.width, self.height))
+        self.image.fill((34, 139, 34))  # Verde bosque
+    
+    def draw(self, screen: pygame.Surface, camera_x: float, camera_y: float, 
+             screen_width: int, screen_height: int) -> None:
+        """
+        Dibuja el fondo con desplazamiento de cámara y efecto infinito
+        
+        Args:
+            screen: Superficie donde dibujar
+            camera_x: Offset X de la cámara
+            camera_y: Offset Y de la cámara
+            screen_width: Ancho de la pantalla
+            screen_height: Alto de la pantalla
+        """
+        if not self.image:
+            return
             
-            # Dibujar múltiples copias del fondo para crear efecto infinito
-            for x in range(-self.width, screen_width + self.width, self.width):
-                for y in range(-self.height, screen_height + self.height, self.height):
-                    screen.blit(self.image, (x + bg_x, y + bg_y))
+        # Calcular posición del fondo
+        bg_x = -camera_x % self.width
+        bg_y = -camera_y % self.height
+        
+        # Dibujar múltiples copias del fondo para crear efecto infinito
+        for x in range(-self.width, screen_width + self.width, self.width):
+            for y in range(-self.height, screen_height + self.height, self.height):
+                screen.blit(self.image, (x + bg_x, y + bg_y))
 
 class Game:
+    """Clase principal del juego"""
+    
     def __init__(self):
         pygame.init()
-        self.screen_width = 1000
-        self.screen_height = 700
+        
+        # Configuración básica
+        self.screen_width = config.SCREEN_WIDTH
+        self.screen_height = config.SCREEN_HEIGHT
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("🍎 Nivel 1 - Tierra de las Manzanas - COMBATE")
+        pygame.display.set_caption(config.TITLE)
         
         self.clock = pygame.time.Clock()
-        self.fps = 60
+        self.fps = config.FPS
         
-        # URLs de los personajes desde GitHub
-        juan_urls = {
-            "up": "https://github.com/user-attachments/assets/9310bb71-1229-4647-b208-b025cced50ec",
-            "down": "https://github.com/user-attachments/assets/507e3015-5213-4134-9564-127d2d0641b7", 
-            "left": "https://github.com/user-attachments/assets/acf6de12-85b7-41ea-868c-8bb9f227ddbb",
-            "right": "https://github.com/user-attachments/assets/10059991-1a75-4a92-8e6c-7a8e6b7e7da0"
-        }
+        # Sistema de cache para recursos
+        self.cache = ResourceCache()
         
-        adan_urls = {
-            "up": "https://github.com/user-attachments/assets/a8b0cb2f-6b0a-460d-aa3e-40a404e02bae",
-            "down": "https://github.com/user-attachments/assets/962334b6-0161-499a-b45d-9537cb82f0ee", 
-            "left": "https://github.com/user-attachments/assets/6fd20d0d-0bce-46e5-ad48-909275503607",
-            "right": "https://github.com/user-attachments/assets/83d3150d-67db-4071-9e46-1f47846f22d0"
-        }
+        # Inicializar componentes del juego
+        self._initialize_characters()
+        self._initialize_combat_systems()
+        self._initialize_camera()
+        self._initialize_background()
+        self._initialize_enemies()
+        self._initialize_game_state()
         
-        # Crear personajes
-        self.juan = Character("Juan", juan_urls, 400, 300)
-        self.adan = Character("Adán", adan_urls, 500, 300)
+    def _initialize_characters(self) -> None:
+        """Inicializa los personajes del juego"""
+        self.juan = Character("Juan", config.JUAN_URLS, 400, 300, self.cache)
+        self.adan = Character("Adán", config.ADAN_URLS, 500, 300, self.cache)
         
-        # Sistemas de ataque
-        self.juan_attack = JuanAttack(self.juan)
-        self.adan_attack = AdanAttack(self.adan)
-        
-        # Sistema de alternancia
+        # Sistema de alternancia de personajes
         self.current_character = self.juan
         self.other_character = self.adan
         
-        # Cámara
-        self.camera_x = 0
-        self.camera_y = 0
+    def _initialize_combat_systems(self) -> None:
+        """Inicializa los sistemas de combate"""
+        self.juan_attack = JuanAttack(self.juan)
+        self.adan_attack = AdanAttack(self.adan)
         
-        # Escenario
-        escenario_url = "https://github.com/user-attachments/assets/00593769-04d2-4083-a4dc-261e6a3fb3e6"
-        self.background = Background(escenario_url, 1536, 512)
+    def _initialize_camera(self) -> None:
+        """Inicializa el sistema de cámara"""
+        self.camera_x = 0.0
+        self.camera_y = 0.0
         
-        # Control de alternancia
+    def _initialize_background(self) -> None:
+        """Inicializa el fondo del juego"""
+        self.background = Background(
+            config.BACKGROUND_URL, 
+            config.BACKGROUND_WIDTH, 
+            config.BACKGROUND_HEIGHT, 
+            self.cache
+        )
+        
+    def _initialize_enemies(self) -> None:
+        """Inicializa el sistema de enemigos"""
+        self.worm_spawner = WormSpawner(max_worms=config.MAX_WORMS)
+        self._setup_enemy_spawns()
+        
+    def _initialize_game_state(self) -> None:
+        """Inicializa el estado del juego"""
         self.switch_cooldown = 0
-        
-        # Sistema de enemigos
-        self.worm_spawner = WormSpawner(max_worms=3)
-        self.setup_enemy_spawns()
-        
-        # Estado del juego
         self.game_over = False
         self.victory = False
         self.enemies_defeated = 0
-        self.victory_condition = 10  # Derrotar 10 gusanos para ganar
+        self.victory_condition = config.VICTORY_CONDITION
         
-    def setup_enemy_spawns(self):
+    def _setup_enemy_spawns(self) -> None:
         """Configura las áreas donde pueden aparecer enemigos"""
-        # Añadir varias áreas de spawn alejadas de los jugadores
-        self.worm_spawner.add_spawn_area(100, 100, 200, 200)
-        self.worm_spawner.add_spawn_area(800, 200, 200, 200)
-        self.worm_spawner.add_spawn_area(300, 600, 200, 200)
-        self.worm_spawner.add_spawn_area(700, 700, 200, 200)
+        spawn_areas = [
+            (100, 100, 200, 200),
+            (800, 200, 200, 200),
+            (300, 600, 200, 200),
+            (700, 700, 200, 200)
+        ]
         
-    def handle_events(self):
-        """Maneja todos los eventos del juego"""
+        for x, y, width, height in spawn_areas:
+            self.worm_spawner.add_spawn_area(x, y, width, height)
+        
+    def handle_events(self) -> bool:
+        """
+        Maneja todos los eventos del juego
+        
+        Returns:
+            True si el juego debe continuar, False si debe terminar
+        """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if not self._handle_keydown_event(event.key):
                     return False
-                elif event.key == pygame.K_TAB and self.switch_cooldown <= 0:
-                    # Alternar entre personajes
-                    self.switch_character()
-                    self.switch_cooldown = 10
-                elif event.key == pygame.K_SPACE:
-                    # Ataque básico del personaje actual
-                    self.perform_basic_attack()
-                elif event.key == pygame.K_x:
-                    # Ataque especial
-                    self.perform_special_attack()
-                elif event.key == pygame.K_r and (self.game_over or self.victory):
-                    # Reiniciar juego
-                    self.restart_game()
         return True
     
-    def switch_character(self):
+    def _handle_keydown_event(self, key: int) -> bool:
+        """
+        Maneja eventos de teclas presionadas
+        
+        Args:
+            key: Código de la tecla presionada
+            
+        Returns:
+            True si el juego debe continuar, False si debe terminar
+        """
+        if key == pygame.K_ESCAPE:
+            return False
+        elif key == pygame.K_TAB and self.switch_cooldown <= 0:
+            self.switch_character()
+            self.switch_cooldown = config.SWITCH_COOLDOWN
+        elif key == pygame.K_SPACE:
+            self.perform_basic_attack()
+        elif key == pygame.K_x:
+            self.perform_special_attack()
+        elif key == pygame.K_r and (self.game_over or self.victory):
+            self.restart_game()
+        
+        return True
+    
+    def switch_character(self) -> None:
         """Alterna entre Juan y Adán"""
         if self.current_character == self.juan:
             self.current_character = self.adan
@@ -312,57 +442,75 @@ class Game:
         
         print(f"🔄 Cambiado a: {self.current_character.name}")
     
-    def perform_basic_attack(self):
+    def perform_basic_attack(self) -> None:
         """Realiza ataque básico del personaje actual"""
         if self.game_over or self.victory:
             return
             
         worms = self.worm_spawner.get_worms()
         
+        hit = False
         if self.current_character == self.juan:
             hit = self.juan_attack.combo_attack(worms)
-            if hit:
-                # Verificar si algún gusano murió
-                for worm in worms:
-                    if not worm.alive:
-                        self.enemies_defeated += 1
         else:  # Adán
             hit = self.adan_attack.melee_attack(worms)
-            if hit:
-                for worm in worms:
-                    if not worm.alive:
-                        self.enemies_defeated += 1
+        
+        if hit:
+            self._check_defeated_enemies(worms)
     
-    def perform_special_attack(self):
+    def perform_special_attack(self) -> None:
         """Realiza ataque especial del personaje actual"""
         if self.game_over or self.victory:
             return
             
         worms = self.worm_spawner.get_worms()
         
+        hit = False
         if self.current_character == self.juan:
             hit = self.juan_attack.special_attack(worms)
-            if hit:
-                for worm in worms:
-                    if not worm.alive:
-                        self.enemies_defeated += 1
-        else:  # Adán
-            # Ataque a distancia hacia el gusano más cercano
+        else:  # Adán - Ataque a distancia hacia el gusano más cercano
             if worms:
-                nearest_worm = min(worms, key=lambda w: 
-                    ((w.x - self.adan.x)**2 + (w.y - self.adan.y)**2)**0.5)
-                hit = self.adan_attack.ranged_attack(nearest_worm.x + 32, nearest_worm.y + 32)
+                nearest_worm = self._find_nearest_worm(worms)
+                hit = self.adan_attack.ranged_attack(
+                    nearest_worm.x + config.CHARACTER_SIZE // 2, 
+                    nearest_worm.y + config.CHARACTER_SIZE // 2
+                )
+        
+        if hit:
+            self._check_defeated_enemies(worms)
     
-    def update(self):
+    def _find_nearest_worm(self, worms: List[WormEnemy]) -> WormEnemy:
+        """Encuentra el gusano más cercano al personaje actual"""
+        return min(worms, key=lambda w: 
+            distance((w.x, w.y), (self.current_character.x, self.current_character.y)))
+    
+    def _check_defeated_enemies(self, worms: List[WormEnemy]) -> None:
+        """Verifica y cuenta los enemigos derrotados"""
+        for worm in worms:
+            if not worm.alive:
+                self.enemies_defeated += 1
+    
+    def update(self) -> None:
         """Actualiza la lógica del juego"""
         if self.game_over or self.victory:
             return
             
         keys_pressed = pygame.key.get_pressed()
         
-        # Actualizar personajes
+        # Actualizar componentes del juego
+        self._update_characters(keys_pressed)
+        self._check_game_conditions()
+        self._update_camera()
+        self._update_combat_systems()
+        self._update_enemies()
+        self._update_cooldowns()
+    
+    def _update_characters(self, keys_pressed: pygame.key.ScancodeWrapper) -> None:
+        """Actualiza los personajes"""
         self.current_character.update(keys_pressed)
-        
+    
+    def _check_game_conditions(self) -> None:
+        """Verifica las condiciones de game over y victoria"""
         # Verificar si los personajes murieron
         if self.juan.health <= 0 and self.adan.health <= 0:
             self.game_over = True
@@ -372,48 +520,54 @@ class Game:
         if self.enemies_defeated >= self.victory_condition:
             self.victory = True
             print("🏆 ¡VICTORIA! Has derrotado a todos los gusanos")
-        
-        # Actualizar cámara para seguir al personaje activo
+    
+    def _update_camera(self) -> None:
+        """Actualiza la posición de la cámara para seguir al personaje activo"""
         target_camera_x = self.current_character.x - self.screen_width // 2
         target_camera_y = self.current_character.y - self.screen_height // 2
         
         # Suavizar movimiento de cámara
-        self.camera_x += (target_camera_x - self.camera_x) * 0.1
-        self.camera_y += (target_camera_y - self.camera_y) * 0.1
-        
-        # Actualizar sistemas de ataque
+        self.camera_x = lerp(self.camera_x, target_camera_x, config.CAMERA_SMOOTHING)
+        self.camera_y = lerp(self.camera_y, target_camera_y, config.CAMERA_SMOOTHING)
+    
+    def _update_combat_systems(self) -> None:
+        """Actualiza los sistemas de combate"""
         worms = self.worm_spawner.get_worms()
         self.juan_attack.update(worms)
         self.adan_attack.update(worms)
-        
-        # Actualizar enemigos
+    
+    def _update_enemies(self) -> None:
+        """Actualiza el sistema de enemigos"""
         players = [self.juan, self.adan]
         self.worm_spawner.update(players)
-        
-        # Verificar ataques de gusanos a jugadores
-        for worm in worms:
-            # Los gusanos ya atacan a los jugadores en su update
-            pass
-        
-        # Reducir cooldown de cambio
+    
+    def _update_cooldowns(self) -> None:
+        """Actualiza los cooldowns del juego"""
         if self.switch_cooldown > 0:
             self.switch_cooldown -= 1
     
-    def restart_game(self):
-        """Reinicia el juego"""
+    def restart_game(self) -> None:
+        """Reinicia el juego al estado inicial"""
         # Reiniciar personajes
         self.juan.health = self.juan.max_health
         self.adan.health = self.adan.max_health
         self.juan.x, self.juan.y = 400, 300
         self.adan.x, self.adan.y = 500, 300
+        self.juan.invulnerable = False
+        self.adan.invulnerable = False
         
         # Reiniciar enemigos
         self.worm_spawner.worms.clear()
         
-        # Reiniciar estado
+        # Reiniciar estado del juego
         self.game_over = False
         self.victory = False
         self.enemies_defeated = 0
+        self.switch_cooldown = 0
+        
+        # Reiniciar cámara
+        self.camera_x = 0.0
+        self.camera_y = 0.0
         
         print("🔄 Juego reiniciado")
     
