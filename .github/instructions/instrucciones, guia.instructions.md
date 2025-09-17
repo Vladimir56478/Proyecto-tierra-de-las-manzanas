@@ -1,0 +1,5 @@
+- Utilizar por defecto Python
+- Haz uso de buenas practicas.
+- Refactoriza el codigo, los archivos en general siempre que sea posible.
+- Mantener el codigo limpio y ordenado.
+- Crea test de las funcionalidades principales.
