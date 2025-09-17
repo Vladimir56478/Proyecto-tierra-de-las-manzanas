@@ -1,15 +1,24 @@
+"""
+Sistema de ataques para el personaje Adán
+"""
 import pygame
 import math
 from enum import Enum
+from typing import List, Optional, Tuple, Any
+
 
 class AttackType(Enum):
+    """Tipos de ataque disponibles para Adán"""
     MELEE = "melee"
     RANGED = "ranged"
 
+
 class AdanAttack:
-    def __init__(self, adan_character):
+    """Sistema de ataques para el personaje Adán"""
+    
+    def __init__(self, adan_character: Any):
         self.adan = adan_character
-        self.attacks = []
+        self.attacks: List[Any] = []
         self.last_attack_time = 0
         self.attack_cooldown = 500  # 500ms entre ataques
         
@@ -20,12 +29,12 @@ class AdanAttack:
         self.ranged_speed = 8
         self.ranged_range = 300
         
-    def can_attack(self):
+    def can_attack(self) -> bool:
         """Verifica si puede atacar (cooldown)"""
         current_time = pygame.time.get_ticks()
         return current_time - self.last_attack_time >= self.attack_cooldown
     
-    def melee_attack(self, targets):
+    def melee_attack(self, targets: List[Any]) -> bool:
         """Ataque cuerpo a cuerpo de Adán"""
         if not self.can_attack():
             return False

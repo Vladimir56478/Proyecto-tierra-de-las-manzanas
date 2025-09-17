@@ -1,15 +1,24 @@
+"""
+Sistema de ataques para el personaje Juan
+"""
 import pygame
 import math
 from enum import Enum
+from typing import List, Optional, Tuple, Any
+
 
 class JuanAttackType(Enum):
+    """Tipos de ataque disponibles para Juan"""
     COMBO = "combo"
     SPECIAL = "special"
 
+
 class JuanAttack:
-    def __init__(self, juan_character):
+    """Sistema de ataques para el personaje Juan con sistema de combos"""
+    
+    def __init__(self, juan_character: Any):
         self.juan = juan_character
-        self.attacks = []
+        self.attacks: List[Any] = []
         self.last_attack_time = 0
         self.attack_cooldown = 400  # 400ms entre ataques
         
@@ -26,17 +35,17 @@ class JuanAttack:
         self.special_cooldown = 3000  # 3s para ataque especial
         self.last_special_time = 0
         
-    def can_attack(self):
+    def can_attack(self) -> bool:
         """Verifica si puede atacar (cooldown)"""
         current_time = pygame.time.get_ticks()
         return current_time - self.last_attack_time >= self.attack_cooldown
     
-    def can_special_attack(self):
+    def can_special_attack(self) -> bool:
         """Verifica si puede usar ataque especial"""
         current_time = pygame.time.get_ticks()
         return current_time - self.last_special_time >= self.special_cooldown
     
-    def combo_attack(self, targets):
+    def combo_attack(self, targets: List[Any]) -> bool:
         """Sistema de combo de Juan"""
         if not self.can_attack():
             return False

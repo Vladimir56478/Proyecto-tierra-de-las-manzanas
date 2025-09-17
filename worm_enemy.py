@@ -1,9 +1,16 @@
+"""
+Sistema de enemigos gusano para el juego
+"""
 import pygame
 import math
 import random
+from typing import List, Tuple, Optional, Any
+
 
 class WormEnemy:
-    def __init__(self, x, y):
+    """Enemigo gusano con IA básica"""
+    
+    def __init__(self, x: float, y: float):
         self.x = x
         self.y = y
         self.max_health = 40
@@ -16,20 +23,20 @@ class WormEnemy:
         
         # Estados de IA
         self.state = "patrol"  # patrol, chase, attack, hurt
-        self.target = None
-        self.patrol_points = []
+        self.target: Optional[Any] = None
+        self.patrol_points: List[Tuple[float, float]] = []
         self.current_patrol = 0
         self.detection_range = 200
         self.give_up_range = 400
         
         # Animación
         self.current_direction = "down"
-        self.animation_frame = 0
+        self.animation_frame = 0.0
         self.animation_speed = 0.15
         
         # Movimiento
-        self.vel_x = 0
-        self.vel_y = 0
+        self.vel_x = 0.0
+        self.vel_y = 0.0
         self.friction = 0.8
         
         # Estado visual
@@ -41,7 +48,7 @@ class WormEnemy:
         
         self.alive = True
     
-    def generate_patrol_points(self):
+    def generate_patrol_points(self) -> None:
         """Genera puntos de patrulla aleatorios alrededor de la posición inicial"""
         base_x, base_y = self.x, self.y
         for _ in range(4):
