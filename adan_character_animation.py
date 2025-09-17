@@ -76,10 +76,63 @@ class AdanCharacter:
                 
             except Exception as e:
                 print(f"❌ Error cargando {direction}: {e}")
-                # Crear frame de respaldo en caso de error
-                backup_surface = pygame.Surface((64, 64))
-                backup_surface.fill((255, 0, 255))  # Color magenta como placeholder
-                self.animations[direction] = [backup_surface]
+                # Crear frame de respaldo con gráficos simples
+                self.animations[direction] = self.create_fallback_animation(direction)
+        
+        # Si no se cargó ninguna animación, crear todas las de respaldo
+        if not any(self.animations.values()):
+            print("🎨 Creando animaciones de respaldo para Adán...")
+            for direction in ["up", "down", "left", "right"]:
+                self.animations[direction] = self.create_fallback_animation(direction)
+    
+    def create_fallback_animation(self, direction):
+        """Crea una animación simple como respaldo usando formas geométricas"""
+        frames = []
+        
+        # Crear 4 frames para una animación simple
+        for frame_idx in range(4):
+            surface = pygame.Surface((64, 64), pygame.SRCALPHA)
+            surface.fill((0, 0, 0, 0))  # Transparente
+            
+            # Cuerpo principal (rojo para Adán)
+            body_color = (200, 50, 50)  # Rojo
+            pygame.draw.ellipse(surface, body_color, (16, 20, 32, 40))
+            
+            # Cabeza
+            head_color = (255, 220, 177)  # Color piel
+            pygame.draw.circle(surface, head_color, (32, 16), 12)
+            
+            # Cabello distintivo (marrón oscuro)
+            hair_color = (101, 67, 33)
+            pygame.draw.ellipse(surface, hair_color, (24, 8, 16, 12))
+            
+            # Brazos (simple líneas)
+            arm_color = (255, 220, 177)
+            arm_offset = (frame_idx % 2) * 2 - 1  # Movimiento de brazos
+            pygame.draw.line(surface, arm_color, (20, 30), (15 + arm_offset, 35), 3)
+            pygame.draw.line(surface, arm_color, (44, 30), (49 - arm_offset, 35), 3)
+            
+            # Piernas (simple líneas)
+            leg_color = (50, 50, 50)  # Negro para pantalones
+            leg_offset = (frame_idx % 2) * 3 - 1  # Movimiento de piernas
+            pygame.draw.line(surface, leg_color, (24, 55), (22 + leg_offset, 62), 4)
+            pygame.draw.line(surface, leg_color, (40, 55), (42 - leg_offset, 62), 4)
+            
+            # Dirección específica - cambiar orientación del personaje
+            if direction == "left":
+                # Voltear horizontalmente
+                surface = pygame.transform.flip(surface, True, False)
+            elif direction == "up":
+                # Hacer más pequeño (perspectiva)
+                surface = pygame.transform.scale(surface, (60, 60))
+                new_surface = pygame.Surface((64, 64), pygame.SRCALPHA)
+                new_surface.blit(surface, (2, 2))
+                surface = new_surface
+            
+            frames.append(surface)
+        
+        print(f"✅ Creada animación de respaldo para Adán '{direction}': {len(frames)} frames")
+        return frames
     
     def take_damage(self, damage):
         """Recibe daño"""
