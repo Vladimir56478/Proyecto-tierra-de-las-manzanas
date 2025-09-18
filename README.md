@@ -1,103 +1,141 @@
-# 🍎 Tierra de las Manzanas - Videojuego
+# 🍎 Proyecto Tierra de las Manzanas
 
-Un videojuego de aventuras desarrollado en Python con pygame, protagonizado por Juan y Adán en la mágica tierra de las manzanas.
+Un juego de aventuras 2D desarrollado en Python con Pygame, donde los personajes Adán y Juan luchan contra gusanos enemigos usando animaciones GIF descargadas desde GitHub.
 
-## 🎮 Descripción del Proyecto
+## ✨ Características Principales
 
-"Tierra de las Manzanas" es un juego de aventuras 2D donde los jugadores pueden controlar a dos personajes principales: Juan y Adán. El juego presenta un mundo dinámico con animaciones fluidas y mecánicas de juego innovadoras.
+### 🎮 Personajes Jugables
+- **Adán**: Personaje principal con ataques cuerpo a cuerpo y proyectiles
+- **Juan**: Personaje secundario con sistema de combos
 
-## 🚀 Características
+### 🎬 Sistema de Animaciones GIF
+- **Movimiento**: Animaciones direccionales (arriba, abajo, izquierda, derecha)
+- **Ataques**: Animaciones únicas para cada dirección de ataque
+- **Descarga automática**: Las animaciones se cargan desde URLs de GitHub Issues
+- **Transparencia**: Fondos transparentes para integración perfecta
 
-### Personajes Jugables
-- **Juan**: Personaje principal con animaciones completas de movimiento
-- **Adán**: Segundo personaje jugable con mecánicas únicas
-- **Sistema de alternancia**: Cambia entre personajes con la tecla TAB
+### ⚔️ Sistema de Combate Mejorado
+- **Adán**: 
+  - Tecla `X` para ataques direccionales
+  - Ataques cuerpo a cuerpo con alcance direccional
+  - Proyectiles de largo alcance
+- **Juan**:
+  - Tecla `Z` para ataques combo direccionales
+  - Sistema de combos (3 niveles)
+  - Daño incremental por combo
 
-### Mecánicas de Juego
-- ✅ Animaciones GIF cargadas desde GitHub
-- ✅ Cámara dinámica que sigue al personaje
-- ✅ Escenario con scroll infinito
-- ✅ Sistema de niveles progresivos
-- ✅ Controles intuitivos (WASD/Flechas)
+### 🐛 Enemigos Inteligentes
+- **Gusanos**: 
+  - IA con estados (patrulla, persecución, ataque)
+  - Animaciones de movimiento con GIF
+  - Estado idle con primer frame cuando están quietos
+  - Sistema de vida y daño
 
-## 📁 Estructura del Proyecto
+## 🎯 Controles
 
+### Movimiento General
+- `↑↓←→` o `WASD`: Mover personaje
+- `ESC`: Salir del juego
+
+### Ataques
+- **Adán**: `X` - Ataque direccional con animación
+- **Juan**: `Z` - Combo direccional con animación
+
+## 🚀 Instalación y Ejecución
+
+### Dependencias
+```bash
+pip install pygame pillow requests
+```
+
+### Estructura del Proyecto
 ```
 Proyecto-tierra-de-las-manzanas/
 ├── src/
-│   ├── characters/          # Código de personajes
-│   │   ├── juan_character.py    # Lógica y animaciones de Juan
-│   │   └── adan_character.py    # Lógica y animaciones de Adán
-│   ├── levels/              # Niveles del juego
-│   │   └── nivel1.py           # Primer nivel del juego
-│   └── utils/               # Utilidades y helpers
-├── assets/                  # Recursos del juego
-│   └── gifs/               # Animaciones GIF
-└── README.md               # Este archivo
+│   ├── characters/
+│   │   ├── adan_character.py
+│   │   └── juan_character.py
+│   ├── attacks/
+│   │   ├── adan_attacks.py
+│   │   └── juan_attacks.py
+│   ├── enemies/
+│   │   └── worm_enemy.py
+│   └── levels/
+└── assets/
+    └── gifs/
 ```
 
-## 🛠️ Tecnologías Utilizadas
+### Ejecución
+```bash
+python src/characters/adan_character.py  # Jugar con Adán
+python src/characters/juan_character.py  # Jugar con Juan
+```
 
-- **Python 3.13+**
-- **Pygame 2.6+** - Motor de juego
-- **Pillow (PIL)** - Procesamiento de imágenes
-- **Requests** - Descarga de assets desde GitHub
+## 🎨 URLs de Animaciones
 
-## 📦 Instalación
+### Adán - Ataques
+- **Arriba**: https://github.com/user-attachments/assets/6544be63-1345-4a5a-b4e9-57ec4a18775a
+- **Abajo**: https://github.com/user-attachments/assets/cbce589c-03c0-4bc0-a067-1b769b154fbd
+- **Izquierda**: https://github.com/user-attachments/assets/1b2a5d84-7ef7-4598-ada0-68f21c785b06
+- **Derecha**: https://github.com/user-attachments/assets/b1dcab29-5e9f-46aa-87f2-1690c0986e77
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone https://github.com/Vladimir56478/Proyecto-tierra-de-las-manzanas.git
-   cd Proyecto-tierra-de-las-manzanas
-   ```
+### Juan - Ataques
+- **Arriba**: https://github.com/user-attachments/assets/dd75fe07-fdbc-44af-b96c-e02d24f1a541
+- **Abajo**: https://github.com/user-attachments/assets/bcd29b68-808b-4840-a6bb-1691c94581b1
+- **Izquierda**: https://github.com/user-attachments/assets/e1db84b2-d37d-4bc4-87f8-cce531c51300
+- **Derecha**: https://github.com/user-attachments/assets/dd1ed297-05f1-468b-83fb-266d510595f3
 
-2. **Instalar dependencias:**
-   ```bash
-   pip install pygame pillow requests
-   ```
+### Gusano - Movimiento
+- **Todas las direcciones**: https://github.com/user-attachments/assets/c275caea-e0a2-4a45-8eb2-a60485090789
 
-3. **Ejecutar el juego:**
-   ```bash
-   # Jugar con Juan
-   python src/characters/juan_character.py
-   
-   # Jugar con Adán
-   python src/characters/adan_character.py
-   
-   # Jugar el Nivel 1 (ambos personajes)
-   python src/levels/nivel1.py
-   ```
+## 🔧 Características Técnicas
 
-## 🎮 Controles
+### Sistema de Animaciones
+- Carga automática de GIFs desde URLs
+- Extracción de frames individuales con PIL
+- Conversión a superficies Pygame con transparencia
+- Manejo de errores con placeholders de respaldo
 
-### Movimiento
-- **↑ / W** - Mover hacia arriba
-- **↓ / S** - Mover hacia abajo
-- **← / A** - Mover hacia la izquierda
-- **→ / D** - Mover hacia la derecha
+### Sistema de Combate
+- Detección de colisiones direccional
+- Áreas de ataque personalizadas por dirección
+- Efectos visuales temporales
+- Sistema de cooldown para ataques
 
-### Sistema de Juego (Nivel 1)
-- **TAB** - Alternar entre Juan y Adán
-- **ESC** - Salir del juego
+### IA de Enemigos
+- Máquina de estados (patrulla, persecución, ataque, herido)
+- Detección de jugadores por proximidad
+- Pathfinding básico hacia objetivos
+- Generación automática de puntos de patrulla
 
-## 🎯 Roadmap
+## 🐛 Issues y Desarrollo
 
-### ✅ Completado
-- [x] Sistema básico de personajes
-- [x] Animaciones con GIFs desde GitHub
-- [x] Nivel 1 funcional
-- [x] Sistema de alternancia de personajes
-- [x] Cámara dinámica
-- [x] Escenario con scroll
+Las animaciones y assets están documentados en las issues del repositorio:
+- Issue #5: Ataques de Adán
+- Issue #6: Ataques de Juan  
+- Issue #7: Movimiento de Gusanos
 
-### 🔄 En Desarrollo
-- [ ] Más niveles
-- [ ] Sistema de colisiones
-- [ ] Objetos interactivos
-- [ ] Sistema de puntuación
-- [ ] Efectos de sonido
-- [ ] Menú principal
+## 🤝 Contribuciones
 
----
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
-¡Disfruta explorando la Tierra de las Manzanas! 🍎🎮
+## 📝 Licencia
+
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
+
+## 🎮 Gameplay
+
+El juego combina elementos de acción y aventura donde los jugadores controlan a Adán o Juan para luchar contra gusanos enemigos en un mundo 2D. Las animaciones fluidas y el sistema de combate direccional crean una experiencia de juego inmersiva y dinámica.
+
+### Mecánicas Principales
+- Exploración del mundo abierto
+- Combate en tiempo real con animaciones
+- Sistema de daño y vida para enemigos
+- Respawn automático de enemigos
+- Efectos visuales y de audio
+
+¡Disfruta explorando la Tierra de las Manzanas! 🍎✨
